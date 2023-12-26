@@ -1,7 +1,8 @@
 'use client'
 import { SERVER_URL } from '@/const'
 import axios from 'axios'
-import { ChangeEvent, FormEvent, useState, useRef, MouseEvent } from 'react'
+import Image from 'next/image'
+import { ChangeEvent, FormEvent, useState, useRef, MouseEvent, useEffect } from 'react'
 
 interface Rect {
   x0: number,
@@ -20,17 +21,45 @@ export default function Home() {
   const [originalImage, setOriginalImage] = useState<Blob | null>(null)
   const [img, setImg] = useState<string>('')
   const [grab, setGrab] = useState<boolean>(false)
-  const styleRef = useRef<HTMLSelectElement>(null)
-  const pColorRef = useRef<HTMLInputElement>(null)
-  const sColorRef = useRef<HTMLInputElement>(null)
+  const [loading, setLoading] = useState<boolean>(false)
+  let styleRef = useRef<HTMLSelectElement>(null)
+  let pColorRef = useRef<HTMLInputElement>(null)
+  let sColorRef = useRef<HTMLInputElement>(null)
   const rectRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+  const resultsContainerRef = useRef<HTMLDivElement>(null)
   const [results, setResults] = useState<Result[]>([])
   const [rect, setRect] = useState<Rect>({x0: 0, y0: 0, x1: 0, y1: 0})
 
+  const scrollToLoader = () => {
+    if (resultRef.current) {
+      resultRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  };
+
+  const scrollToResults = () => {
+    if (resultsContainerRef.current) {
+      resultsContainerRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  };
+  
+  useEffect(() => {
+    if (loading) {
+      scrollToLoader();
+    } else if (results.length !== 0) {
+      scrollToResults()
+    }
+  }, [loading, results]);
+
   const maskHandler = async (e: MouseEvent<HTMLButtonElement>) => {
-    console.log(rect)
     e.preventDefault()
     e.stopPropagation()
     if (rectRef.current && canvasRef.current && imageRef.current) {
@@ -42,17 +71,27 @@ export default function Home() {
         if (ctx) {
           canvas.width = imageRef.current.width
           canvas.height = imageRef.current.height
-          ctx.drawImage(imageRef.current, 0,0)
+          ctx.drawImage(imageRef.current, 0,0, imageRef.current.width, imageRef.current.height)
           
           ctx.clearRect(rect.x0 - imageRef.current.offsetLeft, rect.y0 - imageRef.current.offsetTop, rect.x1-rect.x0, rect.y1-rect.y0)
 
           const newImageURL = canvas.toDataURL('image/png')
-          // console.log(newImageURL)
-          // const response = await fetch(newImageURL)
-          // const blob = await response.blob()
-          // const file = new File([blob], 'modified-image.png', {type: 'image/png'})
           setImg(newImageURL)
         }
+    }
+  }
+
+  const clearHandler = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+
+    setResults([])
+    setLoading(false)
+    setImg('')
+    setOriginalImage(null)
+    if (styleRef.current && pColorRef.current && sColorRef.current) {
+      styleRef.current.value = "Select a base style"
+      sColorRef.current.value = ""
+      pColorRef.current.value = ""
     }
   }
 
@@ -75,20 +114,24 @@ export default function Home() {
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(styleRef.current?.value, pColorRef.current?.value, sColorRef.current?.value, img)
+    setLoading(true)
     const formData = new FormData()
     formData.append("imageFile", img ?? '')
     formData.append("style", styleRef.current?.value ?? '')
     formData.append("pColor", pColorRef.current?.value ?? '')
     formData.append("sColor", sColorRef.current?.value ?? '')
     axios
-      .post(SERVER_URL, formData, {
+      .post(SERVER_URL ?? '', formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
       })
       .then((res) => {
         setResults(res.data)
+        setLoading(false)
+      })
+      .catch(err => {
+        setLoading(false)
       })
   }
 
@@ -98,14 +141,11 @@ export default function Home() {
 
     setGrab(true)
     if (rect) {
-      console.log(e.pageX, e.clientY)
-      setRect(prev => {
-        return {
-          x0: e.clientX,
-          y0: e.clientY,
-          x1: e.clientX,
-          y1: e.clientY
-        }
+      setRect({
+        x0: e.clientX,
+        y0: e.clientY,
+        x1: e.clientX,
+        y1: e.clientY
       })
     }
   }
@@ -132,11 +172,14 @@ export default function Home() {
     <div className='min-h-screen w-full bg-white flex justify-center items-center flex-col'>
       {/* <img src={URL.createObjectURL(image ?? new Blob())} alt="Some image" /> */}
       <form className='flex flex-col gap-4 items-center' onSubmit={onSubmit}>
-        <input className='text-xs w-max relative' onChange={onFileChange} type="file" name="image-file"/>
+        <input key={originalImage ? 'file-input-with-image' : 'file-input-without-image'} className='text-xs w-max relative' onChange={onFileChange} type="file" name="image-file"/>
         { originalImage &&
           <div className='flex flex-col items-center gap-3'>
-            <img ref={imageRef} className='w-full h-auto' onMouseDown={mouseDownHandler} onMouseMove={mouseMoveHandler} onMouseUp={mouseUpHandler} src={URL.createObjectURL(originalImage ?? new Blob())} />
-            <button onClick={maskHandler} className="text-xs px-6 py-3 rounded-full bg-gray-200 w-max">Mask</button>
+            <img alt="original image" ref={imageRef} className='w-full h-auto' onMouseDown={mouseDownHandler} onMouseMove={mouseMoveHandler} onMouseUp={mouseUpHandler} src={URL.createObjectURL(originalImage ?? new Blob())} />
+            <div className='flex flex-row gap-4 justify-center items-center'>
+              <button onClick={maskHandler} className="text-xs px-6 py-3 rounded-full bg-gray-200 w-max">Mask</button>
+              {/* <button onClick={resetMaskHandler} className="text-xs px-6 py-3 rounded-full bg-gray-200 w-max">Reset</button> */}
+            </div>
             <canvas ref={canvasRef}></canvas>
           </div>
         }
@@ -152,16 +195,22 @@ export default function Home() {
         <input ref={sColorRef} className="text-xs px-4 py-3 bg-gray-100 rounded-md" placeholder='Secondary color'/>
         <button className='px-4 py-3 bg-blue-400 w-max rounded-full text-xs text-white' type='submit'>Generate</button>
       </form>
-      {results.length > 0 && 
-        <div className='flex flex-col gap-4 w-full p-16'>
-          <p className='text-xl self-center'>Results</p>
-          {results.map((result, index) => {
-            return (
-              <p className='text-xs' key={index}>{index+1} - <span onClick={() => window.open(result.url, '_blank')} className='underline text-blue-500'>{result.url}</span></p>
-            )
-          })}
-        </div>
-      }
+      <div ref={resultRef} className="flex items-center justify-center mt-10">
+        {loading && <div className='mt-10 flex items-center justify-center'>
+          <div className="border-8 border-[#f3f3f3] border-t-8 border-t-[#3498db] rounded-[50%] w-12 h-12 animate-spin"></div>
+        </div>}
+        {results.length > 0 && 
+          <div ref={resultsContainerRef} className='flex flex-col gap-4 w-full p-16'>
+            <p className='text-xl self-center'>Results</p>
+            {results.map((result, index) => {
+              return (
+                <p className='text-xs w-96 truncate cursor-pointer' key={index}>{index+1} - <span onClick={() => window.open(result.url, '_blank')} className='underline text-blue-500'>{result.url}</span></p>
+              )
+            })}
+            <button className="self-center mt-4 text-xs px-6 py-3 rounded-full bg-red-400 text-white w-max" onClick={clearHandler}>Clear</button>
+          </div>
+        }
+      </div>
     </div>
   )
 }
