@@ -18,7 +18,7 @@ interface Result {
 
 export default function Home() {
   const [originalImage, setOriginalImage] = useState<Blob | null>(null)
-  const [img, setImg] = useState<Blob | null>(null)
+  const [img, setImg] = useState<string>('')
   const [grab, setGrab] = useState<boolean>(false)
   const styleRef = useRef<HTMLSelectElement>(null)
   const pColorRef = useRef<HTMLInputElement>(null)
@@ -47,11 +47,11 @@ export default function Home() {
           ctx.clearRect(rect.x0 - imageRef.current.offsetLeft, rect.y0 - imageRef.current.offsetTop, rect.x1-rect.x0, rect.y1-rect.y0)
 
           const newImageURL = canvas.toDataURL('image/png')
-
-          const response = await fetch(newImageURL)
-          const blob = await response.blob()
-          const file = new File([blob], 'modified-image.png', {type: 'image/png'})
-          setImg(file)
+          // console.log(newImageURL)
+          // const response = await fetch(newImageURL)
+          // const blob = await response.blob()
+          // const file = new File([blob], 'modified-image.png', {type: 'image/png'})
+          setImg(newImageURL)
         }
     }
   }
@@ -75,13 +75,18 @@ export default function Home() {
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log(styleRef.current?.value, pColorRef.current?.value, sColorRef.current?.value, img)
     const formData = new FormData()
-    formData.append("imageFile", img ?? new Blob())
+    formData.append("imageFile", img ?? '')
     formData.append("style", styleRef.current?.value ?? '')
     formData.append("pColor", pColorRef.current?.value ?? '')
     formData.append("sColor", sColorRef.current?.value ?? '')
     axios
-      .post(SERVER_URL, formData, {})
+      .post(SERVER_URL, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      })
       .then((res) => {
         setResults(res.data)
       })
@@ -126,7 +131,7 @@ export default function Home() {
   return (
     <div className='min-h-screen w-full bg-white flex justify-center items-center flex-col'>
       {/* <img src={URL.createObjectURL(image ?? new Blob())} alt="Some image" /> */}
-      <form className='flex flex-col gap-4 items-center' onSubmit={onSubmit} encType='multipart/form-data'>
+      <form className='flex flex-col gap-4 items-center' onSubmit={onSubmit}>
         <input className='text-xs w-max relative' onChange={onFileChange} type="file" name="image-file"/>
         { originalImage &&
           <div className='flex flex-col items-center gap-3'>
