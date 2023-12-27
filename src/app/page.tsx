@@ -25,7 +25,7 @@ export default function Home() {
   let styleRef = useRef<HTMLSelectElement>(null)
   let pColorRef = useRef<HTMLInputElement>(null)
   let sColorRef = useRef<HTMLInputElement>(null)
-  const rectRef = useRef<HTMLDivElement>(null)
+  let rectRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
@@ -82,17 +82,7 @@ export default function Home() {
   }
 
   const clearHandler = (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-
-    setResults([])
-    setLoading(false)
-    setImg('')
-    setOriginalImage(null)
-    if (styleRef.current && pColorRef.current && sColorRef.current) {
-      styleRef.current.value = "Select a base style"
-      sColorRef.current.value = ""
-      pColorRef.current.value = ""
-    }
+    window.location.reload()
   }
 
   function showRect() {
@@ -136,18 +126,19 @@ export default function Home() {
   }
 
   const mouseDownHandler = (e: MouseEvent<HTMLImageElement>) => {
+    console.log('mouseDown')
     e.preventDefault()
     e.stopPropagation()
 
     setGrab(true)
-    if (rect) {
+    // if (rect) {
       setRect({
         x0: e.clientX,
         y0: e.clientY,
         x1: e.clientX,
         y1: e.clientY
       })
-    }
+    // }
   }
 
   const mouseMoveHandler = (e: MouseEvent<HTMLImageElement>) => {
